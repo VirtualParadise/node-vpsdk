@@ -1,8 +1,8 @@
 import { NetConfig } from "./NetConfig";
 import { Lib, Callbacks, Events, Integers, Floats, Strings } from "./Api";
 import { EventEmitter } from "events";
-import { TeleportLocation } from "./TeleportLocation";
 import { IAvatarAddEvent, IAvatarChangeEvent, IAvatarDeleteEvent, IChatEvent } from "./Events";
+import { ITeleportLocation, IConsoleMessage } from "./Interfaces";
 import * as ffi from "ffi";
 
 export class Instance extends EventEmitter {
@@ -169,9 +169,16 @@ export class Instance extends EventEmitter {
     Lib.vp_say(this.vpinstance, message);
   }
 
-  teleportAvatar(session: number, location: TeleportLocation) {
+  teleportAvatar(session: number, location: ITeleportLocation) {
     Lib.vp_teleport_avatar(this.vpinstance, session, location.world, 
       location.position.x, location.position.y, location.position.z, 
       location.rotation.x, location.rotation.y);
+  }
+
+  consoleMessage(messageDescription: IConsoleMessage, session?: number) {
+    Lib.vp_console_message(
+      this.vpinstance, session ? session : 0,
+      messageDescription.name, messageDescription.content, messageDescription.effects,
+      messageDescription.color.r, messageDescription.color.g, messageDescription.color.b);
   }
 }

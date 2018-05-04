@@ -1,4 +1,4 @@
-import { IVector2, IVector3 } from "../Vectors";
+import { IVector2, IVector3 } from "../Interfaces";
 
 export interface IAvatarChangeEvent {
     name: string;
