@@ -1,8 +1,6 @@
-import { Lib, vp_instance_t, NetNotify, NetReturnCode } from "./Api";
+import { Lib, NetNotify, NetReturnCode } from "./Api";
 import * as net from "net";
 import * as timers from "timers";
-import * as ref from "ref";
-import * as ffi from "ffi";
 
 export class Connection {
   socket: net.Socket;
@@ -10,7 +8,7 @@ export class Connection {
   connected: boolean;
   data: Buffer[] = [];
 
-  constructor(private vpconnection: Buffer) {
+  constructor(private vpconnection: number, private sdkModule: any) {
     this.connected = false;
     this.socket = new net.Socket();
   }
@@ -52,25 +50,24 @@ export class Connection {
     });
   }
 
-  send(data: Buffer, length: number) {
-    data = ref.reinterpret(data, length);
+  send(data: Uint8Array) {
+    //data = ref.reinterpret(data, length);
     this.socket.write(data);
-    return length;
+    return data.length;
   }
 
-  recv(data: Buffer, length: number) {
+  recv(destination: Uint8Array) {
     let destinationOffset = 0;
-    data = ref.reinterpret(data, length);
     while (this.data.length !== 0) {
       let buffer = this.data[0];
-      let bytesToCopy = length - destinationOffset;
+      let bytesToCopy = destination.length - destinationOffset;
       if (buffer.length > bytesToCopy) {
-        buffer.copy(data, destinationOffset, 0, bytesToCopy);
+        destination.set(buffer.slice(0, bytesToCopy), destinationOffset);
         this.data[0] = buffer.slice(bytesToCopy);
         destinationOffset += bytesToCopy;
         break;
       } else {
-        buffer.copy(data, destinationOffset, 0);
+        destination.set(buffer, destinationOffset);
         destinationOffset += buffer.length;
         this.data.shift();
       }

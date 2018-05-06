@@ -7,7 +7,7 @@
         "sourceMap": true,
         "declaration": true,
         "outDir": "./lib",
-        "target": "es2015"
+        "target": "es2017"
     },
     "exclude": [
         "node_modules",

@@ -1,54 +1,54 @@
-import { vp_net_config } from "./Api";
-import { Connection } from "./Connection"
-import { Callback } from "ffi";
-import * as ref from "ref";
+import { Connection } from "./Connection";
 
 export class NetConfig {
-  config = new vp_net_config;
-  connections: Buffer[] = [];
+  private connections: Connection[] = [];
+  ptr: number;
 
-  constructor() {
-    this.config.create = Callback("pointer", ["pointer", "pointer"], this.create);
-    this.config.destroy = Callback("void", ["pointer"], this.destroy);
-    this.config.connect = Callback("int", ["pointer", "string", "ushort"], this.connect);
-    this.config.send = Callback("int", ["pointer", "pointer", "int"], this.send);
-    this.config.recv = Callback("int", ["pointer", "pointer", "int"], this.recv);
-    this.config.timeout = Callback("int", ["pointer", "int"], this.timeout);
+  constructor(private module: any) {
+    this.ptr = module._malloc(7 * 4);
+    const pointers = [
+      module.addFunction(this.create, "iii"),
+      module.addFunction(this.destroy, "vi"),
+      module.addFunction(this.connect, "iiii"),
+      module.addFunction(this.send, "iiii"),
+      module.addFunction(this.recv, "iiii"),
+      module.addFunction(this.timeout, "iii"),
+      0
+    ];
+    
+    for (let i=0; i<pointers.length; ++i) {
+      module.setValue(this.ptr + i * 4, pointers[i], "*");
+    }
   }
 
-  getConnection(ptr: Buffer): Connection {
-    return ref.readObject(ptr) as Connection;
+  getConnection(index: number): Connection {
+    return this.connections[index - 1];
   }
 
   create = (vpconnection:any) => {
-    let connection = new Connection(vpconnection);
-    let buf = ref.alloc("Object", connection);
-    this.connections.push(buf);
-    //console.log("create", ref.address(buf));
-    return buf;
+    let connection = new Connection(vpconnection, this.module);
+    return this.connections.push(connection);
   }
 
-  destroy = (ptr: Buffer) => {
-    //console.log("destroy", ref.address(ptr));
-    this.getConnection(ptr).destroy();
-    let idx = this.connections.indexOf(ptr);
-    //console.log("idx ", idx);
+  destroy = (connectionIndex: number) => {
+    this.getConnection(connectionIndex).destroy();
+    delete this.connections[connectionIndex];
   };
 
-  connect = (ptr: Buffer, host: string, port: number) => {
-    return this.getConnection(ptr).connect(host, port);
+  connect = (connectionIndex: number, hostPtr: number, port: number) => {
+    const host = this.module.UTF8ToString(hostPtr)
+    return this.getConnection(connectionIndex).connect(host, port);
   };
 
-  send = (ptr: Buffer, data: Buffer, length: number) => {
-    return this.getConnection(ptr).send(data, length);
+  send = (connectionIndex: number, dataPtr: number, length: number) => {
+    return this.getConnection(connectionIndex).send(new Uint8Array(this.module.HEAP8.buffer, dataPtr, length));
   };
 
-  recv = (ptr: Buffer, data: Buffer, length: number) => {
-    return this.getConnection(ptr).recv(data, length);
+  recv = (connectionIndex: number, dataPtr: number, length: number) => {
+    return this.getConnection(connectionIndex).recv(new Uint8Array(this.module.HEAP8.buffer, dataPtr, length));
   };
 
-  timeout = (ptr: Buffer, seconds: number) => {
-    //console.log("timeout", ref.address(ptr));
-    return this.getConnection(ptr).timeout(seconds);
+  timeout = (connectionIndex: number, seconds: number) => {
+    return this.getConnection(connectionIndex).timeout(seconds);
   };
 }

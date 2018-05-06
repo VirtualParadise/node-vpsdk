@@ -1,20 +1,110 @@
-import * as ffi from "ffi";
-import * as ref from "ref";
-import * as Struct from "ref-struct"
+import { NetConfig } from "./NetConfig";
+import * as path from "path";
 
-export const vp_instance_t = ref.refType(ref.types.void);
-export const vp_net_connection_t  = ref.refType(ref.types.void);
-export const vp_net_config = Struct({
-  "create": "pointer",
-  "destroy": "pointer",
-  "connect": "pointer",
-  "send": "pointer",
-  "recv": "pointer",
-  "timeout": "pointer",
-  "context": "pointer"
-});
+const loader = require("vpsdk-wasm");
 
-export const vp_net_config_p = ref.refType(vp_net_config);
+export let Lib: Functions;
+export class Functions {
+  private netConfig: NetConfig;
+  private events: { [index: number]: { [index: number]: (sender: number) => void; }} = {};
+  private callbacks: { [index: number]: { [index: number]: (sender: number, rc: number, reference: number) => void; }} = {};
+  private handleEventPtr: number;
+  private handleCallbackPtr: number;
+
+  constructor(private module: any) {
+    this.netConfig = new NetConfig(module);
+    this.handleEventPtr = module.addFunction(this.handleEvent, "vi");
+    this.handleCallbackPtr = module.addFunction(this.handleCallback, "viii");
+  }
+
+  vp_create() {
+    const instance = this.module.ccall("vp_create", "number", ["number"], [this.netConfig.ptr]);
+    this.events[instance] = {};
+    this.callbacks[instance] = {};
+    return instance;
+  }
+
+  vp_destroy(instance: number) {
+    const result = this.module.ccall("vp_destroy", null, ["number"]);
+    delete this.events[instance];
+    delete this.callbacks[instance];
+    return result;
+  }
+
+  vp_connect_universe = this.module.cwrap("vp_connect_universe", "number", ["number", "string", "number"]);
+  vp_login = this.module.cwrap("vp_login", "number", ["number", "string", "string", "string"]);
+  vp_enter = this.module.cwrap("vp_enter", "number", ["number", "string"]);
+  vp_leave = this.module.cwrap("vp_leave", "number", ["number"]);
+  vp_say = this.module.cwrap("vp_say", "number", ["number", "string"]);
+  vp_console_message = this.module.cwrap("vp_console_message", "number", ["number", "number", "string", "string", "number", "number", "number", "number"]);
+  
+  private handleEvent = (sender: number) => {
+    const eventIndex = this.vp_int(sender, Integers.VP_CURRENT_EVENT);
+    const handler = this.events[sender][eventIndex];
+    if (handler) {
+      handler(sender);
+    }
+  }
+
+  vp_event_set(instance: number, eventIndex: number, handler: (sender: number) => void) {
+    this.events[instance][eventIndex] = handler;
+    return this.module.ccall("vp_event_set", "number", ["number", "number", "number"], [instance, eventIndex, this.handleEventPtr]);
+  }
+
+  private handleCallback = (sender: number, rc: number, reference: number) => {
+    const callbackIndex = this.vp_int(sender, Integers.VP_CURRENT_CALLBACK);
+    const handler = this.callbacks[sender][callbackIndex];
+    if (handler) {
+      handler(sender, rc, reference);
+    }
+  }
+
+  vp_callback_set(instance: number, callbackIndex: number, handler: (sender: number, rc: number, reference: number) => void) {
+    this.callbacks[instance][callbackIndex] = handler;
+    return this.module.ccall("vp_callback_set", "number", ["number", "number", "number"], [instance, callbackIndex, this.handleCallbackPtr]);
+  }
+
+  vp_user_data = this.module.cwrap("vp_user_data", "number", ["number"]);
+  vp_user_data_set = this.module.cwrap("vp_user_data_set", "void", ["number", "number"]);
+  vp_state_change = this.module.cwrap("vp_state_change", "number", ["number"]);
+  vp_int = this.module.cwrap("vp_int", "number", ["number", "number"]);
+  vp_float = this.module.cwrap("vp_float", "number", ["number", "number"]);
+  vp_double = this.module.cwrap("vp_double", "double", ["number", "number"]);
+  vp_string = this.module.cwrap("vp_string", "string", ["number", "number"]);
+  vp_data = this.module.cwrap("vp_data", "number", ["number", "number", "number"]);
+  vp_int_set = this.module.cwrap("vp_int_set", "number", ["number", "number", "number"]);
+  vp_float_set = this.module.cwrap("vp_float_set", "number", ["number", "number", "number"]);
+  vp_double_set = this.module.cwrap("vp_double_set", "number", ["number", "number", "double"]);
+  vp_string_set = this.module.cwrap("vp_string_set", "number", ["number", "number", "string"]);
+  vp_query_cell_revision = this.module.cwrap("vp_query_cell_revision", "number", ["number", "number", "number"]);
+  vp_object_add = this.module.cwrap("vp_object_add", "number", ["number"]);
+  vp_object_load = this.module.cwrap("vp_object_load", "number", ["number"]);
+  vp_object_bump_begin = this.module.cwrap("vp_object_bump_begin", "number", ["number", "number", "number"]);
+  vp_object_bump_end = this.module.cwrap("vp_object_bump_end", "number", ["number", "number", "number"]);
+  vp_object_change = this.module.cwrap("vp_object_change", "number", ["number"]);
+  vp_object_click = this.module.cwrap("vp_object_click", "number", ["number", "number", "number", "number", "number", "number"]);
+  vp_object_delete = this.module.cwrap("vp_object_delete", "number", ["number", "number"]);
+  vp_object_get = this.module.cwrap("vp_object_get", "number", ["number", "number"]);
+  vp_world_list = this.module.cwrap("vp_world_list", "number", ["number", "number"]);
+  vp_user_attributes_by_id = this.module.cwrap("vp_user_attributes_by_id", "number", ["number", "number"]);
+  vp_teleport_avatar = this.module.cwrap("vp_teleport_avatar", "number", ["number", "number", "string", "number", "number", "number", "number", "number"]);
+  vp_net_notify = this.module.cwrap("vp_net_notify", "number", ["number", "number", "number"])
+}
+
+export function initializeVpsdk(): Promise<void> {
+  if (Lib) {
+    return;
+  }
+  
+  return new Promise<void>((resolve, reject) => {
+    loader({
+      locateFile: (name: string) => path.join(path.dirname(require.resolve("vpsdk-wasm")), name)
+    }).then((module: any) => {
+        Lib = new Functions(module);
+        resolve();
+    }, (error: any) => reject(error));
+  });
+}
 
 export enum Integers {
   VP_AVATAR_SESSION,
@@ -27,7 +117,7 @@ export enum Integers {
   VP_WORLD_STATE,
   VP_WORLD_USERS,
   VP_REFERENCE_NUMBER,
-  VP_CALLBACK,
+  VP_CURRENT_CALLBACK,
   VP_USER_ID,
   VP_USER_REGISTRATION_TIME,
   VP_USER_ONLINE_TIME,
@@ -57,8 +147,8 @@ export enum Integers {
   VP_DISCONNECT_ERROR_CODE,
   VP_URL_TARGET,
   VP_CURRENT_EVENT,
-  VP_CURRENT_CALLBACK,
-  VP_CELL_REVISION,
+  //VP_CURRENT_CALLBACK,
+  VP_CELL_REVISION = 38,
   VP_CELL_STATUS,
   VP_JOIN_ID
 }
@@ -177,42 +267,3 @@ export enum NetNotify {
     VP_NET_NOTIFY_TIMEOUT
 }
 
-export const Lib = ffi.Library("vpsdk", {
-  "vp_create": [vp_instance_t, [vp_net_config_p]],
-  "vp_destroy": ["int", [vp_instance_t]],
-  "vp_connect_universe": ["int", [vp_instance_t, "string", "int"]],
-  "vp_login": ["int", [vp_instance_t, "string", "string", "string"]],
-  "vp_enter": ["int", [vp_instance_t, "string"]],
-  "vp_leave": ["int", [vp_instance_t]],
-  "vp_wait": ["int", [vp_instance_t, "int"]],
-  "vp_say": ["int", [vp_instance_t, "string"]],
-  "vp_console_message": ["int", [vp_instance_t, "int", "string", "string", "int", "uint8", "uint8", "uint8"]],
-  "vp_event_set": ["int", [vp_instance_t, "int", "pointer"]],
-  "vp_callback_set": ["int", [vp_instance_t, "int", "pointer"]],
-  "vp_user_data": ["pointer", [vp_instance_t]],
-  "vp_user_data_set": ["void", [vp_instance_t, "pointer"]],
-  "vp_state_change": ["int", [vp_instance_t]],
-  "vp_int": ["int", [vp_instance_t, "int"]],
-  "vp_float": ["float", [vp_instance_t, "int"]],
-  "vp_double": ["double", [vp_instance_t, "int"]],
-  "vp_string": ["string", [vp_instance_t, "int"]],
-  "vp_data": ["pointer", [vp_instance_t, "int", "int*"]],
-  "vp_int_set": ["int", [vp_instance_t, "int", "int"]],
-  "vp_float_set": ["int", [vp_instance_t, "int", "float"]],
-  "vp_double_set": ["int", [vp_instance_t, "int", "double"]],
-  "vp_string_set": ["int", [vp_instance_t, "int", "string"]],
-  "vp_query_cell_revision": ["int", [vp_instance_t, "int", "int"]],
-  "vp_object_add": ["int", [vp_instance_t]],
-  "vp_object_load": ["int", [vp_instance_t]],
-  "vp_object_bump_begin": ["int", [vp_instance_t, "int", "int"]],
-  "vp_object_bump_end": ["int", [vp_instance_t, "int", "int"]],
-  "vp_object_change": ["int", [vp_instance_t]],
-  "vp_object_click": ["int", [vp_instance_t, "int", "int", "float", "float", "float"]],
-  "vp_object_delete": ["int", [vp_instance_t, "int"]],
-  "vp_object_get": ["int", [vp_instance_t, "int"]],
-  "vp_world_list": ["int", [vp_instance_t, "int"]],
-  "vp_user_attributes_by_id": ["int", [vp_instance_t, "int"]],
-  "vp_teleport_avatar": ["int", [vp_instance_t, "int", "string", "float", "float", "float", "float", "float"]],
-  "vp_net_notify": ["int", [vp_net_connection_t, "int", "int"]]
-  // ...
-});

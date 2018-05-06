@@ -1,6 +1,6 @@
 {
   "name": "node-vpsdk",
-  "version": "0.0.1",
+  "version": "0.2.1",
   "description": "Node wrapper for VPSDK",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -11,15 +11,11 @@
   "author": "Edwin Rijkee <edwin@virtualparadise.org>",
   "license": "MIT",
   "devDependencies": {
-    "@types/ffi": "0.0.19",
     "@types/node": "^7.0.5",
     "@types/promise": "^7.1.30",
-    "@types/ref": "0.0.28",
     "typescript": "^2.1.6"
   },
   "dependencies": {
-    "ffi": "^2.2.0",
-    "ref": "^1.3.3",
-    "ref-struct": "^1.1.0"
+    "vpsdk-wasm": "https://dev.virtualparadise.org/downloads/vpsdk-wasm-0.1.2017.tgz"
   }
 }

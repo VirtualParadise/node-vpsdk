@@ -1,12 +1,9 @@
-import { NetConfig } from "./NetConfig";
-import { Lib, Callbacks, Events, Integers, Floats, Strings } from "./Api";
+import { Lib, Callbacks, Events, Integers, Floats, Strings, initializeVpsdk } from "./Api";
 import { EventEmitter } from "events";
 import { IAvatarAddEvent, IAvatarChangeEvent, IAvatarDeleteEvent, IChatEvent } from "./Events";
 import { ITeleportLocation, IConsoleMessage } from "./Interfaces";
-import * as ffi from "ffi";
 
 export class Instance extends EventEmitter {
-  static netConfig = new NetConfig;
   vpinstance: any;
 
   nativeCallbacks: Buffer[] = [];
@@ -14,37 +11,17 @@ export class Instance extends EventEmitter {
 
   private connectPromise: Promise<void>;
 
-  constructor() {
-    super();
-
-    this.vpinstance = Lib.vp_create(Instance.netConfig.config.ref());
-    this.setEvent(Events.VP_EVENT_CHAT, () => this.handleChat());
-    this.setEvent(Events.VP_EVENT_AVATAR_ADD, () => this.handleAvatarAdd());
-    this.setEvent(Events.VP_EVENT_AVATAR_CHANGE, () => this.handleAvatarChange());
-    this.setEvent(Events.VP_EVENT_AVATAR_DELETE, () => this.handleAvatarDelete());
-    this.setEvent(Events.VP_EVENT_UNIVERSE_DISCONNECT, () => this.emit("universeDisconnect"));
-    this.setEvent(Events.VP_EVENT_WORLD_DISCONNECT, () => this.emit("worldDisconnect"));
-  }
-
   destroy() {
     Lib.vp_destroy(this.vpinstance);
     this.vpinstance = null;
   }
 
   private setEvent(event: number, handler: () => void) {
-    let nativeHandler = ffi.Callback("void", ["pointer"], (sender: any) => {
-      handler();
-    });
-    this.nativeEvents[event] = nativeHandler;
-    Lib.vp_event_set(this.vpinstance, event, nativeHandler);
+    Lib.vp_event_set(this.vpinstance, event, handler);
   }
 
-  private setCallback(callback: number, handler: (rc: number) => void) {
-    let nativeHandler = ffi.Callback("void", ["pointer", "int"], (sender: any, rc: number) => {
-      handler(rc);
-    });
-    this.nativeCallbacks[callback] = nativeHandler;
-    Lib.vp_callback_set(this.vpinstance, callback, nativeHandler);
+  private setCallback(callback: number, handler: (rc: number, reference: number) => void) {
+    Lib.vp_callback_set(this.vpinstance, callback, (sender, rc, reference) => handler(rc, reference));
   }
 
   private handleAvatarAdd() {
@@ -103,13 +80,25 @@ export class Instance extends EventEmitter {
     this.emit("chat", data);
   }
 
-  connect(host:string, port:number) {
-    return new Promise((resolve, reject) => {
+  async connect(host:string, port:number): Promise<void> {
+    if (!this.vpinstance) {
+      await initializeVpsdk();
+      this.vpinstance = Lib.vp_create();
+
+      this.setEvent(Events.VP_EVENT_CHAT, () => this.handleChat());
+      this.setEvent(Events.VP_EVENT_AVATAR_ADD, () => this.handleAvatarAdd());
+      this.setEvent(Events.VP_EVENT_AVATAR_CHANGE, () => this.handleAvatarChange());
+      this.setEvent(Events.VP_EVENT_AVATAR_DELETE, () => this.handleAvatarDelete());
+      this.setEvent(Events.VP_EVENT_UNIVERSE_DISCONNECT, () => this.emit("universeDisconnect"));
+      this.setEvent(Events.VP_EVENT_WORLD_DISCONNECT, () => this.emit("worldDisconnect"));
+    }
+    
+    return await new Promise<void>((resolve, reject) => {
       this.setCallback(Callbacks.VP_CALLBACK_CONNECT_UNIVERSE, (rc) => {
         if (rc) {
           reject(rc);
         } else {
-          resolve(null);
+          resolve();
         }
       });
 
