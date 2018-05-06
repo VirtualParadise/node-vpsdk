@@ -16,6 +16,6 @@
     "typescript": "^2.1.6"
   },
   "dependencies": {
-    "vpsdk-wasm": "https://dev.virtualparadise.org/downloads/vpsdk-wasm-0.1.2017.tgz"
+    "vpsdk-wasm": "https://dev.virtualparadise.org/downloads/vpsdk-wasm-0.1.2018.tgz"
   }
 }
