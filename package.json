@@ -8,6 +8,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepublish": "tsc"
   },
+  "files": [
+    "lib"
+  ],
   "author": "Edwin Rijkee <edwin@virtualparadise.org>",
   "license": "MIT",
   "devDependencies": {
