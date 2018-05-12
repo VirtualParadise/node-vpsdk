@@ -1,5 +1,5 @@
-import { NetConfig } from "./NetConfig";
 import * as path from "path";
+import { NetConfig } from "./NetConfig";
 
 const loader = require("vpsdk-wasm");
 
@@ -71,7 +71,19 @@ export class Functions {
   vp_float = this.module.cwrap("vp_float", "number", ["number", "number"]);
   vp_double = this.module.cwrap("vp_double", "double", ["number", "number"]);
   vp_string = this.module.cwrap("vp_string", "string", ["number", "number"]);
-  vp_data = this.module.cwrap("vp_data", "number", ["number", "number", "number"]);
+
+  private _vp_data = this.module.cwrap("vp_data", "number", ["number", "number", "number"]);
+  vp_data(instance: number, dataIndex: number) {
+    const lengthPtr = this.module._malloc(4);
+    const ptr = this._vp_data(instance, dataIndex, lengthPtr);
+    const length = this.module.HEAP32[lengthPtr / 4];
+    this.module._free(lengthPtr);
+    if (ptr !== 0 && length !== 0) {
+      return new Uint8Array(this.module.HEAPU8.buffer, ptr, length);
+    }
+    return null;
+  }
+
   vp_int_set = this.module.cwrap("vp_int_set", "number", ["number", "number", "number"]);
   vp_float_set = this.module.cwrap("vp_float_set", "number", ["number", "number", "number"]);
   vp_double_set = this.module.cwrap("vp_double_set", "number", ["number", "number", "double"]);
@@ -204,6 +216,11 @@ export enum Strings {
   VP_JOIN_WORLD,
   VP_JOIN_NAME,
   VP_START_WORLD
+}
+
+export enum Datas {
+  VP_OBJECT_DATA,
+  VP_TERRAIN_NODE_DATA
 }
 
 export enum Events {

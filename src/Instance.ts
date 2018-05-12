@@ -1,15 +1,18 @@
-import { Lib, Callbacks, Events, Integers, Floats, Strings, initializeVpsdk } from "./Api";
 import { EventEmitter } from "events";
+import { Callbacks, Datas, Events, Floats, Integers, Lib, Strings, initializeVpsdk } from "./Api";
 import { IAvatarAddEvent, IAvatarChangeEvent, IAvatarDeleteEvent, IChatEvent } from "./Events";
-import { ITeleportLocation, IConsoleMessage } from "./Interfaces";
+import { ICellQueryResult, IConsoleMessage, IObject, ITeleportLocation, QueryStatus } from "./Interfaces";
+
+class ICellQueryResolveReject {
+  resolve: (result: ICellQueryResult) => void; 
+  reject: (error: any) => void;
+}
 
 export class Instance extends EventEmitter {
-  vpinstance: any;
-
-  nativeCallbacks: Buffer[] = [];
-  nativeEvents: Buffer[] = [];
-
+  private vpinstance: any;
   private connectPromise: Promise<void>;
+  private cellResolveRejects: { [index: string]: ICellQueryResolveReject; } = {};
+  private currentCellObjects: IObject[] = [];
 
   destroy() {
     Lib.vp_destroy(this.vpinstance);
@@ -91,6 +94,8 @@ export class Instance extends EventEmitter {
       this.setEvent(Events.VP_EVENT_AVATAR_DELETE, () => this.handleAvatarDelete());
       this.setEvent(Events.VP_EVENT_UNIVERSE_DISCONNECT, () => this.emit("universeDisconnect"));
       this.setEvent(Events.VP_EVENT_WORLD_DISCONNECT, () => this.emit("worldDisconnect"));
+      this.setEvent(Events.VP_EVENT_OBJECT, () => this.handleObject());
+      this.setEvent(Events.VP_EVENT_CELL_END, () => this.handleCellEnd());
     }
     
     return await new Promise<void>((resolve, reject) => {
@@ -169,5 +174,83 @@ export class Instance extends EventEmitter {
       this.vpinstance, session ? session : 0,
       messageDescription.name, messageDescription.content, messageDescription.effects,
       messageDescription.color.r, messageDescription.color.g, messageDescription.color.b);
+  }
+
+  queryCell(x: number, z: number, revision?: number) {
+    revision = revision || 0;
+
+    const key = this.getCellKey(x, z);
+    const promise = new Promise<ICellQueryResult>((resolve, reject) => {
+      this.cellResolveRejects[key] = { resolve: resolve, reject: reject };
+    });
+    Lib.vp_query_cell_revision(this.vpinstance, x, z, revision);
+    return promise;
+  }
+  
+  private getCellKey(x: number, z: number) {
+    return `${x} ${z}`
+  }
+
+  private readObject() {
+    const sourceData = Lib.vp_data(this.vpinstance, Datas.VP_OBJECT_DATA);
+    let data: Uint8Array;
+    if (sourceData) {
+      data = new Uint8Array(sourceData.length);
+      data.set(sourceData);
+    }
+    
+    const object: IObject = {
+      id: Lib.vp_int(this.vpinstance, Integers.VP_OBJECT_ID),
+      type: Lib.vp_int(this.vpinstance, Integers.VP_OBJECT_TYPE),
+      owner: Lib.vp_int(this.vpinstance, Integers.VP_OBJECT_USER_ID),
+      model: Lib.vp_string(this.vpinstance, Strings.VP_OBJECT_MODEL),
+      description: Lib.vp_string(this.vpinstance, Strings.VP_OBJECT_DESCRIPTION),
+      action: Lib.vp_string(this.vpinstance, Strings.VP_OBJECT_ACTION),
+      position: {
+        x: Lib.vp_double(this.vpinstance, Floats.VP_OBJECT_X),
+        y: Lib.vp_double(this.vpinstance, Floats.VP_OBJECT_Y),
+        z: Lib.vp_double(this.vpinstance, Floats.VP_OBJECT_Z)
+      },
+      rotationAxis: {
+        x: Lib.vp_float(this.vpinstance, Floats.VP_OBJECT_ROTATION_X),
+        y: Lib.vp_float(this.vpinstance, Floats.VP_OBJECT_ROTATION_Y),
+        z: Lib.vp_float(this.vpinstance, Floats.VP_OBJECT_ROTATION_Z)
+      },
+      rotationAngle: Lib.vp_float(this.vpinstance, Floats.VP_OBJECT_ROTATION_ANGLE),
+      date: new Date(Lib.vp_int(this.vpinstance, Integers.VP_OBJECT_TIME) * 1000),
+      data: data
+    };
+    return object;
+  }
+
+  private handleObject() {
+    const sessionId = Lib.vp_int(this.vpinstance, Integers.VP_AVATAR_SESSION);
+    const object = this.readObject();
+    if (sessionId === 0) {
+      this.currentCellObjects.push(object);
+    } else {
+      //TODO: handle object add event
+    }
+  }
+  
+  private handleCellEnd() {
+    const x = Lib.vp_int(this.vpinstance, Integers.VP_CELL_X);
+    const z = Lib.vp_int(this.vpinstance, Integers.VP_CELL_Z);
+    const revision = Lib.vp_int(this.vpinstance, Integers.VP_CELL_REVISION);
+    const status = Lib.vp_int(this.vpinstance, Integers.VP_CELL_STATUS);
+    const objects = this.currentCellObjects;
+    this.currentCellObjects = [];
+
+    const key = this.getCellKey(x, z);
+    if (status === QueryStatus.Modified || status === QueryStatus.NotModified) {
+      this.cellResolveRejects[key].resolve({
+        status: status,
+        revision: revision,
+        objects: objects
+      });
+    } else {
+      this.cellResolveRejects[key].reject(`query failed: ${status}`);
+    }
+    delete this.cellResolveRejects[key];
   }
 }
