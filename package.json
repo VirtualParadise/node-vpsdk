@@ -12,6 +12,8 @@
     "lib"
   ],
   "author": "Edwin Rijkee <edwin@virtualparadise.org>",
+  "homepage": "https://github.com/VirtualParadise/node-vpsdk#readme",
+  "repository": "github:VirtualParadise/node-vpsdk",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^7.0.5",
