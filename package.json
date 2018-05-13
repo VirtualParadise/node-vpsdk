@@ -16,9 +16,8 @@
   "repository": "github:VirtualParadise/node-vpsdk",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^7.0.5",
-    "@types/promise": "^7.1.30",
-    "typescript": "^2.1.6"
+    "@types/node": "^10.0.8",
+    "typescript": "^2.8.3"
   },
   "dependencies": {
     "vpsdk-wasm": "https://dev.virtualparadise.org/downloads/vpsdk-wasm-0.1.2019.tgz"
