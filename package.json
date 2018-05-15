@@ -20,6 +20,6 @@
     "typescript": "^2.8.3"
   },
   "dependencies": {
-    "vpsdk-wasm": "https://dev.virtualparadise.org/downloads/vpsdk-wasm-0.1.2019.tgz"
+    "vpsdk-wasm": "https://dev.virtualparadise.org/downloads/vpsdk-wasm-0.1.2020.tgz"
   }
 }
