@@ -83,7 +83,10 @@ export class Instance extends EventEmitter {
     this.emit("chat", data);
   }
 
-  async connect(host:string, port:number): Promise<void> {
+  async connect(host?:string, port?:number): Promise<void> {
+    host = host || "universe.virtualparadise.org";
+    port = port || 57000;
+    
     if (!this.vpinstance) {
       await initializeVpsdk();
       this.vpinstance = Lib.vp_create();
