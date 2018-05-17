@@ -3,8 +3,14 @@ import { Callbacks, Datas, Events, Floats, Integers, Lib, Strings, initializeVps
 import { IAvatarAddEvent, IAvatarChangeEvent, IAvatarDeleteEvent, IChatEvent } from "./Events";
 import { ICellQueryResult, IConsoleMessage, IObject, ITeleportLocation, QueryStatus } from "./Interfaces";
 
-class ICellQueryResolveReject {
+interface ICellQueryResolveReject {
   resolve: (result: ICellQueryResult) => void; 
+  reject: (error: any) => void;
+}
+
+interface ICallbackData {
+  handler: () => void;
+  resolve: (result: any) => void; 
   reject: (error: any) => void;
 }
 
@@ -12,6 +18,8 @@ export class Instance extends EventEmitter {
   private vpinstance: any;
   private connectPromise: Promise<void>;
   private cellResolveRejects: { [index: string]: ICellQueryResolveReject; } = {};
+  private callbackData: { [index: number]: ICallbackData } = {};
+  private nextRequestId: number = 0;
   private currentCellObjects: IObject[] = [];
 
   destroy() {
@@ -99,6 +107,7 @@ export class Instance extends EventEmitter {
       this.setEvent(Events.VP_EVENT_WORLD_DISCONNECT, () => this.emit("worldDisconnect"));
       this.setEvent(Events.VP_EVENT_OBJECT, () => this.handleObject());
       this.setEvent(Events.VP_EVENT_CELL_END, () => this.handleCellEnd());
+      this.setCallback(Callbacks.VP_CALLBACK_OBJECT_GET, this.handleCallback);
     }
     
     return await new Promise<void>((resolve, reject) => {
@@ -255,5 +264,38 @@ export class Instance extends EventEmitter {
       this.cellResolveRejects[key].reject(`query failed: ${status}`);
     }
     delete this.cellResolveRejects[key];
+  }
+
+  private handleCallback = (rc: number, ref: number) => {
+    const data = this.callbackData[ref];
+    if (data) {
+      if (rc) {
+        data.reject(rc);
+      } else {
+        let result: any;
+        try {
+          result = data.handler();
+        } catch(error) {
+          data.reject(error);
+          return;
+        }
+        data.resolve(result);
+      }
+    }
+  }
+
+  getObject(id: number) {
+    return new Promise<IObject>((resolve, reject) => {
+      const requestId = this.nextRequestId++;
+      this.callbackData[requestId] = {
+        resolve: resolve,
+        reject: reject,
+        handler: () => {
+          return this.readObject();
+        }
+      };
+      Lib.vp_int_set(this.vpinstance, Integers.VP_REFERENCE_NUMBER, requestId);
+      Lib.vp_object_get(this.vpinstance, id);
+    });
   }
 }

@@ -41,7 +41,6 @@ async function main() {
 
 ## TODO
 - World list
-- Get object by ID
 - Get user attributes
 - Object add/change/delete/load methods and events
 - Object click (method and event)
