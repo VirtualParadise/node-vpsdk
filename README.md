@@ -1,3 +1,6 @@
+[![npm version](https://badge.fury.io/js/node-vpsdk.svg)](https://badge.fury.io/js/node-vpsdk)
+[![Build Status](https://edwinrijkee.visualstudio.com/node-vpsdk/_apis/build/status/node-vpsdk%20build)](https://edwinrijkee.visualstudio.com/node-vpsdk/_build/latest?definitionId=1)
+
 # Virtual Paradise Bot SDK Bindings for Node.js
 
 ## Install
