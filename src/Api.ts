@@ -103,12 +103,13 @@ export class Functions {
   vp_net_notify = this.module.cwrap("vp_net_notify", "number", ["number", "number", "number"])
 }
 
+let libPromise: Promise<void>;
 export function initializeVpsdk(): Promise<void> {
-  if (Lib) {
-    return;
+  if (libPromise) {
+    return libPromise;
   }
   
-  return new Promise<void>((resolve, reject) => {
+  return libPromise = new Promise<void>((resolve, reject) => {
     loader({
       locateFile: (name: string) => path.join(path.dirname(require.resolve("vpsdk-wasm")), name)
     }).then((module: any) => {
